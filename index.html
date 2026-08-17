@@ -14,9 +14,7 @@
         #reader { width: 100%; margin-top: 10px; display: none; }
         .success { color: green; font-weight: bold; }
         .error { color: red; font-weight: bold; }
-        
-        /* De Groene Knop */
-        #drive-link { display: block; background: #16a34a; color: white; text-align: center; padding: 15px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 15px; }
+        .drive-btn { display: block; background: #16a34a; color: white !important; text-align: center; padding: 15px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 12px; }
     </style>
 </head>
 <body>
@@ -46,8 +44,7 @@
         <p id="res-status" style="margin: 10px 0;"></p>
         <p id="res-path" style="font-size: 11px; color: gray; word-break: break-all; margin: 0;"></p>
         
-        <!-- Knop staat standaard klaar -->
-        <a id="drive-link" href="#" target="_blank" style="display:none;">📁 Open Foto op Google Drive</a>
+        <a id="drive-link" class="drive-btn" href="#" target="_blank" style="display:none;">📁 Open Foto op Google Drive</a>
     </div>
 
     <script>
@@ -86,10 +83,10 @@
                 let rawPath = db[ean];
                 document.getElementById('res-path').innerText = "Bestand: " + rawPath;
 
-                // Haal alles na de laatste schuine streep op (werkt met / én \)
+                // Stript '40 BABYVOEDING\IMAGES\' en pakt alleen de bestandsnaam '8713500011897.1'
                 let bestandsNaam = rawPath.replace(/\\/g, '/').split('/').pop();
 
-                // Stel de groene knop in
+                // Maak de link aan voor Google Drive
                 let btn = document.getElementById('drive-link');
                 btn.href = "https://drive.google.com/drive/search?q=" + encodeURIComponent(bestandsNaam);
                 btn.style.display = 'block';
