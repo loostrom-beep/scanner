@@ -11,6 +11,7 @@
         h1 { color: #1a365d; text-align: center; font-size: 1.3em; }
         input, button { width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box; font-size: 15px; }
         button { background: #1a365d; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-reset { background: #d97706 !important; margin-top: 8px; }
         #reader { width: 100%; margin-top: 10px; display: none; border-radius: 8px; overflow: hidden; }
         .success { color: green; font-weight: bold; }
         .error { color: red; font-weight: bold; }
@@ -37,8 +38,9 @@
     <div class="card">
         <b>3. Scannen met Camera</b>
         <button id="camBtn" onclick="toggleCamera()">📷 Start Camera</button>
+        <button id="resetBtn" class="btn-reset" onclick="herstartCameraDirect()" style="display:none;">🔄 Reset Camera / Volgende Scan</button>
         <div id="reader"></div>
-        <div id="scan-notice">⏸️ Scanner pauzeert...</div>
+        <div id="scan-notice">⏸️ Product gescand! Tik op 'Reset Camera' voor volgend product.</div>
     </div>
 
     <div class="card" id="result" style="display:none;">
@@ -46,7 +48,7 @@
         <p id="res-status" style="margin: 10px 0;"></p>
         <p id="res-path" style="font-size: 11px; color: gray; word-break: break-all; margin: 0;"></p>
         
-        <a id="drive-link" class="drive-btn" href="#" target="_blank" style="display:none;">📁 Open Foto op Google Drive</a>
+        <a id="drive-link" class="drive-btn" href="#" target="_blank" rel="noopener noreferrer">📁 Open Foto op Google Drive</a>
     </div>
 
     <script>
@@ -108,6 +110,7 @@
         function startCameraEngine() {
             const r = document.getElementById('reader');
             const camBtn = document.getElementById('camBtn');
+            const resetBtn = document.getElementById('resetBtn');
             
             r.style.display = 'block';
             if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
@@ -119,20 +122,15 @@
                 config,
                 (text) => {
                     verwerkEan(text);
+                    // Zet camera stil bij succesvolle scan
                     if (html5QrCode.getState() === Html5QrcodeScannerState.SCANNING) {
                         html5QrCode.pause();
                         document.getElementById('scan-notice').style.display = 'block';
-
-                        setTimeout(() => {
-                            if (html5QrCode && html5QrCode.getState() === Html5QrcodeScannerState.PAUSED) {
-                                html5QrCode.resume();
-                                document.getElementById('scan-notice').style.display = 'none';
-                            }
-                        }, 2000);
                     }
                 }
             ).then(() => {
                 camBtn.innerText = "⏹️ Stop Camera";
+                resetBtn.style.display = 'block';
                 isCameraRunning = true;
             }).catch(err => console.log("Camera start fout:", err));
         }
@@ -140,10 +138,13 @@
         function stopCameraEngine() {
             const r = document.getElementById('reader');
             const camBtn = document.getElementById('camBtn');
+            const resetBtn = document.getElementById('resetBtn');
+
             if (html5QrCode && isCameraRunning) {
                 html5QrCode.stop().then(() => {
                     r.style.display = 'none';
                     camBtn.innerText = "📷 Start Camera";
+                    resetBtn.style.display = 'none';
                     isCameraRunning = false;
                     document.getElementById('scan-notice').style.display = 'none';
                 }).catch(err => console.log("Camera stop fout:", err));
@@ -158,24 +159,23 @@
             }
         }
 
-        // 🔄 HERSTART CAMERA WANNEER JE TERUGKEERT IN DE APP
-        document.addEventListener("visibilitychange", function() {
-            if (document.hidden) {
-                // Je verlaat de pagina (bijv. tikt op Google Drive link)
-                if (isCameraRunning && html5QrCode) {
-                    html5QrCode.pause();
-                }
+        // Knop om camera direct weer wakker te schudden als je terugkeert van Google Drive
+        function herstartCameraDirect() {
+            if (!html5QrCode) return;
+            
+            document.getElementById('scan-notice').style.display = 'none';
+            
+            if (html5QrCode.getState() === Html5QrcodeScannerState.PAUSED) {
+                html5QrCode.resume();
             } else {
-                // Je komt terug in de web-app
-                if (isCameraRunning && html5QrCode) {
-                    if (html5QrCode.getState() === Html5QrcodeScannerState.PAUSED) {
-                        html5QrCode.resume();
-                    } else if (html5QrCode.getState() === Html5QrcodeScannerState.NOT_STARTED) {
-                        startCameraEngine();
-                    }
-                }
+                // Als de browser de hele videostream heeft gesloopt, herstarten we hem volledig
+                html5QrCode.stop().then(() => {
+                    startCameraEngine();
+                }).catch(() => {
+                    startCameraEngine();
+                });
             }
-        });
+        }
     </script>
 </body>
 </html>
