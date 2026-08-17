@@ -10,52 +10,51 @@
         .card { background: white; padding: 15px; border-radius: 8px; max-width: 400px; margin: 10px auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         h1 { color: #1a365d; font-size: 1.4em; }
         h3 { font-size: 1em; color: #4b5563; text-align: left; margin-top: 0; }
-        input[type="text"], input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 8px; }
-        button { width: 100%; padding: 10px; background: #1a365d; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        input[type="text"], input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 8px; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: #1a365d; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 15px; }
         #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; margin-top: 10px; display: none; }
         #result { display: none; text-align: left; margin-top: 10px; }
         .success { color: #2e7d32; font-weight: bold; }
         .error { color: #c62828; font-weight: bold; }
-        #product-img { width: 100%; max-height: 250px; object-fit: contain; margin-top: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        .btn-link { display: block; background: #0f9d58; color: white; text-align: center; padding: 10px; border-radius: 4px; text-decoration: none; font-weight: bold; margin-top: 10px; }
+        
+        /* Grote opvallende knop voor Google Drive */
+        .drive-btn { display: block; background: #16a34a; color: white !important; text-align: center; padding: 14px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 12px; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .drive-btn:active { background: #15803d; }
     </style>
 </head>
 <body>
 
     <h1>PIM Barcode Scanner</h1>
 
-    <!-- 1. Handmatig Zoeken -->
+    <!-- 1. CSV Database Laden -->
     <div class="card">
-        <h3>1. Handmatig Zoeken</h3>
-        <input type="text" id="manualEan" placeholder="Typ EAN code...">
-        <button onclick="zoekHandmatig()">🔍 Zoek</button>
+        <h3>1. Laad CSV Database</h3>
+        <input type="file" id="csvFile" accept=".csv">
+        <p id="db-status" style="font-size: 0.8em; color: gray; margin: 0;"></p>
     </div>
 
-    <!-- 2. Camera Scanner -->
+    <!-- 2. Handmatig Zoeken -->
     <div class="card">
-        <h3>2. Scannen met Camera</h3>
+        <h3>2. Handmatig Zoeken</h3>
+        <input type="text" id="manualEan" placeholder="Typ EAN code..." inputmode="numeric">
+        <button onclick="zoekHandmatig()">🔍 Zoek Product</button>
+    </div>
+
+    <!-- 3. Camera Scanner -->
+    <div class="card">
+        <h3>3. Scannen met Camera</h3>
         <button id="camBtn" onclick="toggleCamera()">📷 Start Camera</button>
         <div id="reader"></div>
     </div>
 
-    <!-- 3. Resultaat -->
+    <!-- 4. Resultaat -->
     <div class="card" id="result">
-        <h3 id="res-ean">EAN: -</h3>
-        <p id="res-status"></p>
-        <p id="res-path" style="font-size: 0.75em; color: gray; word-break: break-all;"></p>
+        <h3 id="res-ean" style="margin-top:0;">EAN: -</h3>
+        <p id="res-status" style="font-size:1.1em;"></p>
+        <p id="res-path" style="font-size: 0.8em; color: #6b7280; word-break: break-all;"></p>
         
-        <!-- Afbeelding weergave -->
-        <img id="product-img" src="" alt="Productfoto" style="display:none;" onerror="fotoMislukt()">
-        
-        <!-- Directe knop naar Google Drive voor je werkaccount -->
-        <a id="drive-btn" class="btn-link" href="#" target="_blank" style="display:none;">📁 Open Foto op Google Drive</a>
-    </div>
-
-    <!-- 4. Database CSV -->
-    <div class="card">
-        <h3>3. Laad CSV Database</h3>
-        <input type="file" id="csvFile" accept=".csv">
-        <p id="db-status" style="font-size: 0.8em; color: gray;"></p>
+        <!-- Altijd werkende direct aanklikbare knop -->
+        <a id="drive-link" class="drive-btn" href="#" target="_blank">📁 Bekijk Foto in Google Drive</a>
     </div>
 
     <script>
@@ -85,50 +84,40 @@
             reader.readAsText(file);
         });
 
-        // Zoek & Scan Functie
+        // Verwerk EAN code
         function verwerkEan(ean) {
-            document.getElementById('result').style.display = 'block';
-            document.getElementById('res-ean').innerText = "EAN: " + ean;
+            const resCard = document.getElementById('result');
+            const resStatus = document.getElementById('res-status');
+            const resPath = document.getElementById('res-path');
+            const driveLink = document.getElementById('drive-link');
+
+            resCard.style.display = 'block';
+            document.getElementById('res-ean').innerText = "Gescand/Zocht: " + ean;
 
             if (db[ean]) {
-                document.getElementById('res-status').className = 'success';
-                document.getElementById('res-status').innerText = "✅ Product aanwezig in PIM!";
-                document.getElementById('res-path').innerText = "Pad: " + db[ean];
-
+                resStatus.className = 'success';
+                resStatus.innerText = "✅ Product aanwezig in PIM!";
+                
                 let bestand = db[ean];
-                let imgTag = document.getElementById('product-img');
-                let driveBtn = document.getElementById('drive-btn');
+                resPath.innerText = "Bestand: " + bestand;
 
-                // Bouw de link op voor Google Drive
-                if (bestand.startsWith('http')) {
-                    imgTag.src = bestand;
-                    driveBtn.href = bestand;
-                } else {
-                    // Als het bestand een ID of pad is, zoek hem direct in jouw zakelijke Drive
-                    let cleanPath = encodeURIComponent(bestand);
-                    driveBtn.href = "https://drive.google.com/drive/search?q=" + cleanPath;
-                    imgTag.src = "https://drive.google.com/thumbnail?authuser=0&sz=w800&id=" + bestand;
-                }
+                // Haal alleen de bestandsnaam op (bijv. 'foto.jpg' i.p.v. 'O:\map\foto.jpg')
+                let schoneNaam = bestand.split('\\').pop().split('/').pop();
 
-                imgTag.style.display = 'block';
-                driveBtn.style.display = 'block';
+                // Maak een directe zoeklink in jouw zakelijke Google Drive
+                driveLink.href = "https://drive.google.com/drive/search?q=" + encodeURIComponent(schoneNaam);
+                driveLink.style.display = 'block';
             } else {
-                document.getElementById('res-status').className = 'error';
-                document.getElementById('res-status').innerText = "❌ Niet gevonden in PIM database";
-                document.getElementById('res-path').innerText = "";
-                document.getElementById('product-img').style.display = 'none';
-                document.getElementById('drive-btn').style.display = 'none';
+                resStatus.className = 'error';
+                resStatus.innerText = "❌ Niet gevonden in PIM database";
+                resPath.innerText = "";
+                driveLink.style.display = 'none';
             }
         }
 
         function zoekHandmatig() {
             const ean = document.getElementById('manualEan').value.trim();
             if (ean) verwerkEan(ean);
-        }
-
-        function fotoMislukt() {
-            // Als de rechtstreekse afbeelding blokkeert door browserbeveiliging
-            document.getElementById('product-img').style.display = 'none';
         }
 
         function toggleCamera() {
