@@ -10,8 +10,8 @@
         .card { background: white; padding: 15px; border-radius: 8px; max-width: 400px; margin: 10px auto; text-align: left; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         h1 { color: #1a365d; text-align: center; font-size: 1.3em; }
         input, button { width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box; font-size: 15px; }
-        button { background: #1a365d; color: white; border: none; border-radius: 4px; font-weight: bold; }
-        #reader { width: 100%; margin-top: 10px; display: none; }
+        button { background: #1a365d; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        #reader { width: 100%; margin-top: 10px; display: none; border-radius: 8px; overflow: hidden; }
         .success { color: green; font-weight: bold; }
         .error { color: red; font-weight: bold; }
         .drive-btn { display: block; background: #16a34a; color: white !important; text-align: center; padding: 15px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 12px; }
@@ -35,7 +35,7 @@
 
     <div class="card">
         <b>3. Scannen met Camera</b>
-        <button onclick="toggleCamera()">📷 Start Camera</button>
+        <button id="camBtn" onclick="toggleCamera()">📷 Start Camera</button>
         <div id="reader"></div>
     </div>
 
@@ -48,8 +48,10 @@
     </div>
 
     <script>
-        let db = {};
+        let db = new Map(); // Gebruik een snellere Map-structuur voor 40.000+ items
         let html5QrCode = null;
+        let isCameraRunning = false;
+        let isProcessingScan = false;
 
         document.getElementById('csvFile').addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -58,16 +60,17 @@
             const reader = new FileReader();
             reader.onload = function(evt) {
                 const lines = evt.target.result.split('\n');
-                db = {};
-                lines.forEach(line => {
+                db.clear();
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
                     const parts = line.includes(';') ? line.split(';') : line.split(',');
                     if (parts.length >= 2) {
                         const ean = parts[0].trim().replace(/"/g, '');
                         const path = parts[1].trim().replace(/"/g, '');
-                        if (ean) db[ean] = path;
+                        if (ean) db.set(ean, path);
                     }
-                });
-                document.getElementById('db-status').innerText = '✅ ' + Object.keys(db).length + ' producten geladen!';
+                }
+                document.getElementById('db-status').innerText = '✅ ' + db.size + ' producten razendsnel geladen!';
             };
             reader.readAsText(file);
         });
@@ -76,17 +79,15 @@
             document.getElementById('result').style.display = 'block';
             document.getElementById('res-ean').innerText = "Gescand: " + ean;
 
-            if (db[ean]) {
+            if (db.has(ean)) {
                 document.getElementById('res-status').className = 'success';
                 document.getElementById('res-status').innerText = "✅ Product aanwezig in PIM!";
                 
-                let rawPath = db[ean];
+                let rawPath = db.get(ean);
                 document.getElementById('res-path').innerText = "Bestand: " + rawPath;
 
-                // Stript '40 BABYVOEDING\IMAGES\' en pakt alleen de bestandsnaam '8713500011897.1'
                 let bestandsNaam = rawPath.replace(/\\/g, '/').split('/').pop();
 
-                // Maak de link aan voor Google Drive
                 let btn = document.getElementById('drive-link');
                 btn.href = "https://drive.google.com/drive/search?q=" + encodeURIComponent(bestandsNaam);
                 btn.style.display = 'block';
@@ -105,13 +106,44 @@
 
         function toggleCamera() {
             const r = document.getElementById('reader');
-            r.style.display = 'block';
+            const camBtn = document.getElementById('camBtn');
+
             if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-            html5QrCode.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 150 } },
-                (text) => { verwerkEan(text); }
-            ).catch(err => alert("Cameratoestemming vereist."));
+
+            if (isCameraRunning) {
+                html5QrCode.stop().then(() => {
+                    r.style.display = 'none';
+                    camBtn.innerText = "📷 Start Camera";
+                    isCameraRunning = false;
+                });
+            } else {
+                r.style.display = 'block';
+                // Lichte instellingen voor soepele werking op mobiel
+                const config = { 
+                    fps: 5, // Verlaagd van 10 naar 5 voor minder processorbelasting
+                    qrbox: { width: 220, height: 130 },
+                    videoConstraints: {
+                        facingMode: "environment",
+                        focusMode: "continuous"
+                    }
+                };
+
+                html5QrCode.start(
+                    { facingMode: "environment" },
+                    config,
+                    (text) => {
+                        // Voorkom dubbele/vastlopende scans achter elkaar
+                        if (!isProcessingScan) {
+                            isProcessingScan = true;
+                            verwerkEan(text);
+                            setTimeout(() => { isProcessingScan = false; }, 1500);
+                        }
+                    }
+                ).then(() => {
+                    camBtn.innerText = "⏹️ Stop Camera";
+                    isCameraRunning = true;
+                }).catch(err => alert("Cameratoestemming vereist."));
+            }
         }
     </script>
 </body>
