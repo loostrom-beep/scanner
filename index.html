@@ -3,68 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PIM Barcode Scanner</title>
+    <title>PIM Scanner Test</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 15px; background: #f4f4f9; }
-        .card { background: white; padding: 15px; border-radius: 8px; max-width: 400px; margin: 10px auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        h1 { color: #1a365d; font-size: 1.4em; }
-        h3 { font-size: 1em; color: #4b5563; text-align: left; margin-top: 0; }
-        input[type="text"], input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 8px; font-size: 16px; }
-        button { width: 100%; padding: 12px; background: #1a365d; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 15px; }
-        #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; margin-top: 10px; display: none; }
-        #result { display: none; text-align: left; margin-top: 10px; }
-        .success { color: #2e7d32; font-weight: bold; }
-        .error { color: #c62828; font-weight: bold; }
-        
-        /* Werkende Groene Knop */
-        .drive-btn { display: block; background: #16a34a; color: white !important; text-align: center; padding: 14px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 12px; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        body { font-family: sans-serif; text-align: center; padding: 15px; background: #f0f0f0; }
+        .card { background: white; padding: 15px; border-radius: 8px; max-width: 400px; margin: 10px auto; text-align: left; }
+        input, button { width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box; }
+        #reader { width: 100%; margin-top: 10px; display: none; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        pre { background: #eee; padding: 10px; font-size: 11px; white-space: pre-wrap; word-break: break-all; }
     </style>
 </head>
 <body>
 
-    <h1>PIM Barcode Scanner</h1>
+    <h2>PIM Test Scanner</h2>
 
-    <!-- 1. CSV Database Laden -->
     <div class="card">
-        <h3>1. Laad CSV Database</h3>
+        <b>1. Laad CSV</b>
         <input type="file" id="csvFile" accept=".csv">
-        <p id="db-status" style="font-size: 0.8em; color: gray; margin: 0;"></p>
+        <p id="db-status" style="font-size: 12px; color: gray;"></p>
     </div>
 
-    <!-- 2. Handmatig Zoeken -->
     <div class="card">
-        <h3>2. Handmatig Zoeken</h3>
-        <input type="text" id="manualEan" placeholder="Typ EAN code..." inputmode="numeric">
-        <button onclick="zoekHandmatig()">🔍 Zoek Product</button>
-    </div>
-
-    <!-- 3. Camera Scanner -->
-    <div class="card">
-        <h3>3. Scannen met Camera</h3>
-        <button id="camBtn" onclick="toggleCamera()">📷 Start Camera</button>
+        <b>2. Zoek of Scan</b>
+        <input type="text" id="manualEan" placeholder="Typ EAN...">
+        <button onclick="zoek()">Zoek EAN</button>
+        <button onclick="toggleCam()" style="background:#1a365d; color:white;">Start Camera</button>
         <div id="reader"></div>
     </div>
 
-    <!-- 4. Resultaat -->
-    <div class="card" id="result">
-        <h3 id="res-ean" style="margin-top:0;">EAN: -</h3>
-        <p id="res-status" style="font-size:1.1em;"></p>
-        <p id="res-path" style="font-size: 0.8em; color: #6b7280; word-break: break-all;"></p>
-        
-        <!-- Direct werkende link naar Google Drive -->
-        <a id="drive-link" class="drive-btn" href="#" target="_blank">📁 Bekijk Foto in Google Drive</a>
+    <div class="card" id="result" style="display:none;">
+        <h3 id="res-ean"></h3>
+        <p id="res-status"></p>
+        <p><b>Tekst in jouw CSV:</b></p>
+        <pre id="res-raw"></pre>
     </div>
 
     <script>
         let db = {};
         let html5QrCode = null;
-        let isCameraRunning = false;
 
         document.getElementById('csvFile').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = function(evt) {
                 const lines = evt.target.result.split('\n');
@@ -74,75 +56,42 @@
                     if (parts.length >= 2) {
                         const ean = parts[0].trim().replace(/"/g, '');
                         const path = parts[1].trim().replace(/"/g, '');
-                        if (ean) {
-                            db[ean] = path;
-                        }
+                        if (ean) db[ean] = path;
                     }
                 });
-                document.getElementById('db-status').innerText = '✅ ' + Object.keys(db).length + ' producten geladen!';
+                document.getElementById('db-status').innerText = Object.keys(db).length + ' producten geladen.';
             };
             reader.readAsText(file);
         });
 
-        function verwerkEan(ean) {
-            const resCard = document.getElementById('result');
-            const resStatus = document.getElementById('res-status');
-            const resPath = document.getElementById('res-path');
-            const driveLink = document.getElementById('drive-link');
-
-            resCard.style.display = 'block';
-            document.getElementById('res-ean').innerText = "Gescand/Zocht: " + ean;
-
+        function verwerk(ean) {
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('res-ean').innerText = "EAN: " + ean;
             if (db[ean]) {
-                resStatus.className = 'success';
-                resStatus.innerText = "✅ Product aanwezig in PIM!";
-                
-                let bestand = db[ean];
-                resPath.innerText = "Bestand: " + bestand;
-
-                let schoneNaam = bestand.split('\\').pop().split('/').pop();
-
-                driveLink.href = "https://drive.google.com/drive/search?q=" + encodeURIComponent(schoneNaam);
-                driveLink.style.display = 'block';
+                document.getElementById('res-status').className = 'success';
+                document.getElementById('res-status').innerText = "✅ Product gevonden in CSV";
+                document.getElementById('res-raw').innerText = db[ean];
             } else {
-                resStatus.className = 'error';
-                resStatus.innerText = "❌ Niet gevonden in PIM database";
-                resPath.innerText = "";
-                driveLink.style.display = 'none';
+                document.getElementById('res-status').className = 'error';
+                document.getElementById('res-status').innerText = "❌ Niet gevonden";
+                document.getElementById('res-raw').innerText = "-";
             }
         }
 
-        function zoekHandmatig() {
-            const ean = document.getElementById('manualEan').value.trim();
-            if (ean) verwerkEan(ean);
+        function zoek() {
+            const val = document.getElementById('manualEan').value.trim();
+            if (val) verwerk(val);
         }
 
-        function toggleCamera() {
-            const readerDiv = document.getElementById('reader');
-            const camBtn = document.getElementById('camBtn');
-
+        function toggleCam() {
+            const r = document.getElementById('reader');
+            r.style.display = 'block';
             if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-
-            if (isCameraRunning) {
-                html5QrCode.stop().then(() => {
-                    readerDiv.style.display = 'none';
-                    camBtn.innerText = "📷 Start Camera";
-                    isCameraRunning = false;
-                });
-            } else {
-                readerDiv.style.display = 'block';
-                html5QrCode.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 250, height: 150 } },
-                    (decodedText) => { verwerkEan(decodedText); },
-                    (errorMessage) => {}
-                ).then(() => {
-                    camBtn.innerText = "⏹️ Stop Camera";
-                    isCameraRunning = true;
-                }).catch(err => {
-                    alert("Cameratoestemming vereist.");
-                });
-            }
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 150 } },
+                (text) => { verwerk(text); }
+            ).catch(err => alert("Camera fout"));
         }
     </script>
 </body>
