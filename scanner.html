@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIM Barcode Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 15px; background: #f4f4f9; }
+        h1 { color: #1a365d; font-size: 1.5em; }
+        .box { background: white; padding: 15px; border-radius: 8px; max-width: 400px; margin: 10px auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; margin-top: 10px; }
+        #result-card { display: none; margin-top: 15px; text-align: left; }
+        #product-img { width: 100%; max-height: 250px; object-fit: contain; margin-top: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .success { color: #2e7d32; font-weight: bold; }
+        .error { color: #c62828; font-weight: bold; }
+        button { padding: 10px 15px; background: #1a365d; color: white; border: none; border-radius: 4px; font-weight: bold; width: 100%; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>PIM Barcode Scanner</h1>
+
+    <div class="box">
+        <h3>1. Laad je CSV bestand</h3>
+        <input type="file" id="csvFile" accept=".csv">
+        <p id="db-status" style="color: gray; font-size: 0.8em; margin-top: 5px;"></p>
+    </div>
+
+    <div class="box">
+        <h3>2. Scanner</h3>
+        <button onclick="startCamera()">📷 Start Camera Scanner</button>
+        <div id="reader"></div>
+    </div>
+
+    <div class="box" id="result-card">
+        <h3 id="ean-display">EAN: -</h3>
+        <p id="status-msg"></p>
+        <p id="path-display" style="font-size: 0.75em; color: gray; word-break: break-all;"></p>
+        <img id="product-img" src="" alt="Productfoto" style="display:none;">
+    </div>
+
+    <script>
+        let db = {};
+
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const lines = evt.target.result.split('\n');
+                db = {};
+                lines.forEach(line => {
+                    const parts = line.split(';');
+                    if (parts.length >= 2) {
+                        const ean = parts[0].trim().replace(/"/g, '');
+                        const path = parts[1].trim().replace(/"/g, '');
+                        db[ean] = path;
+                    }
+                });
+                document.getElementById('db-status').innerText = '✅ ' + Object.keys(db).length + ' producten geladen!';
+            };
+            reader.readAsText(file);
+        });
+
+        function verwerkEan(ean) {
+            document.getElementById('result-card').style.display = 'block';
+            document.getElementById('ean-display').innerText = "Gescand: " + ean;
+
+            if (db[ean]) {
+                document.getElementById('status-msg').className = 'success';
+                document.getElementById('status-msg').innerText = "✅ Product aanwezig in PIM!";
+                document.getElementById('path-display').innerText = "Relatief pad: " + db[ean];
+
+                // Controleer of de CSV een directe web/drive link of lokaal pad heeft
+                let fotoBron = db[ean];
+                if (!fotoBron.startsWith('http')) {
+                    // Verwijs naar Drive als het geen URL is
+                    fotoBron = "https://drive.google.com/thumbnail?sz=w800&id=" + db[ean];
+                }
+
+                const imgTag = document.getElementById('product-img');
+                imgTag.src = fotoBron;
+                imgTag.style.display = 'block';
+            } else {
+                document.getElementById('status-msg').className = 'error';
+                document.getElementById('status-msg').innerText = "❌ Niet gevonden in PIM database";
+                document.getElementById('path-display').innerText = "";
+                document.getElementById('product-img').style.display = 'none';
+            }
+        }
+
+        function startCamera() {
+            const html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 150 } },
+                (decodedText) => { verwerkEan(decodedText); },
+                (errorMessage) => {}
+            ).catch(err => {
+                alert("Camera kon niet worden gestart. Check je browser-rechten.");
+            });
+        }
+    </script>
+</body>
+</html> 
