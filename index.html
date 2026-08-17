@@ -15,6 +15,7 @@
         .success { color: green; font-weight: bold; }
         .error { color: red; font-weight: bold; }
         .drive-btn { display: block; background: #16a34a; color: white !important; text-align: center; padding: 15px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 12px; }
+        #scan-notice { display: none; background: #fef3c7; color: #92400e; padding: 8px; border-radius: 4px; font-size: 13px; text-align: center; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -37,6 +38,7 @@
         <b>3. Scannen met Camera</b>
         <button id="camBtn" onclick="toggleCamera()">📷 Start Camera</button>
         <div id="reader"></div>
+        <div id="scan-notice">⏸️ Scanner pauzeert 2 sec...</div>
     </div>
 
     <div class="card" id="result" style="display:none;">
@@ -48,10 +50,9 @@
     </div>
 
     <script>
-        let db = new Map(); // Gebruik een snellere Map-structuur voor 40.000+ items
+        let db = new Map();
         let html5QrCode = null;
         let isCameraRunning = false;
-        let isProcessingScan = false;
 
         document.getElementById('csvFile').addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -70,7 +71,7 @@
                         if (ean) db.set(ean, path);
                     }
                 }
-                document.getElementById('db-status').innerText = '✅ ' + db.size + ' producten razendsnel geladen!';
+                document.getElementById('db-status').innerText = '✅ ' + db.size + ' producten geladen!';
             };
             reader.readAsText(file);
         });
@@ -118,25 +119,30 @@
                 });
             } else {
                 r.style.display = 'block';
-                // Lichte instellingen voor soepele werking op mobiel
                 const config = { 
-                    fps: 5, // Verlaagd van 10 naar 5 voor minder processorbelasting
-                    qrbox: { width: 220, height: 130 },
-                    videoConstraints: {
-                        facingMode: "environment",
-                        focusMode: "continuous"
-                    }
+                    fps: 10,
+                    qrbox: { width: 220, height: 130 }
                 };
 
                 html5QrCode.start(
                     { facingMode: "environment" },
                     config,
                     (text) => {
-                        // Voorkom dubbele/vastlopende scans achter elkaar
-                        if (!isProcessingScan) {
-                            isProcessingScan = true;
-                            verwerkEan(text);
-                            setTimeout(() => { isProcessingScan = false; }, 1500);
+                        // 1. Verwerk gescande EAN
+                        verwerkEan(text);
+
+                        // 2. Zet de camera direct op pauze (voorkomt vastlopen)
+                        if (html5QrCode.getState() === Html5QrcodeScannerState.SCANNING) {
+                            html5QrCode.pause();
+                            document.getElementById('scan-notice').style.display = 'block';
+
+                            // 3. Hervat de camera automatisch na 2 seconden
+                            setTimeout(() => {
+                                if (html5QrCode.getState() === Html5QrcodeScannerState.PAUSED) {
+                                    html5QrCode.resume();
+                                    document.getElementById('scan-notice').style.display = 'none';
+                                }
+                            }, 2000);
                         }
                     }
                 ).then(() => {
