@@ -38,7 +38,7 @@
         <b>3. Scannen met Camera</b>
         <button id="camBtn" onclick="toggleCamera()">📷 Start Camera</button>
         <div id="reader"></div>
-        <div id="scan-notice">⏸️ Scanner pauzeert 2 sec...</div>
+        <div id="scan-notice">⏸️ Scanner pauzeert...</div>
     </div>
 
     <div class="card" id="result" style="display:none;">
@@ -105,52 +105,77 @@
             if (val) verwerkEan(val);
         }
 
-        function toggleCamera() {
+        function startCameraEngine() {
             const r = document.getElementById('reader');
             const camBtn = document.getElementById('camBtn');
-
+            
+            r.style.display = 'block';
             if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
 
-            if (isCameraRunning) {
+            const config = { fps: 10, qrbox: { width: 220, height: 130 } };
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                (text) => {
+                    verwerkEan(text);
+                    if (html5QrCode.getState() === Html5QrcodeScannerState.SCANNING) {
+                        html5QrCode.pause();
+                        document.getElementById('scan-notice').style.display = 'block';
+
+                        setTimeout(() => {
+                            if (html5QrCode && html5QrCode.getState() === Html5QrcodeScannerState.PAUSED) {
+                                html5QrCode.resume();
+                                document.getElementById('scan-notice').style.display = 'none';
+                            }
+                        }, 2000);
+                    }
+                }
+            ).then(() => {
+                camBtn.innerText = "⏹️ Stop Camera";
+                isCameraRunning = true;
+            }).catch(err => console.log("Camera start fout:", err));
+        }
+
+        function stopCameraEngine() {
+            const r = document.getElementById('reader');
+            const camBtn = document.getElementById('camBtn');
+            if (html5QrCode && isCameraRunning) {
                 html5QrCode.stop().then(() => {
                     r.style.display = 'none';
                     camBtn.innerText = "📷 Start Camera";
                     isCameraRunning = false;
-                });
-            } else {
-                r.style.display = 'block';
-                const config = { 
-                    fps: 10,
-                    qrbox: { width: 220, height: 130 }
-                };
-
-                html5QrCode.start(
-                    { facingMode: "environment" },
-                    config,
-                    (text) => {
-                        // 1. Verwerk gescande EAN
-                        verwerkEan(text);
-
-                        // 2. Zet de camera direct op pauze (voorkomt vastlopen)
-                        if (html5QrCode.getState() === Html5QrcodeScannerState.SCANNING) {
-                            html5QrCode.pause();
-                            document.getElementById('scan-notice').style.display = 'block';
-
-                            // 3. Hervat de camera automatisch na 2 seconden
-                            setTimeout(() => {
-                                if (html5QrCode.getState() === Html5QrcodeScannerState.PAUSED) {
-                                    html5QrCode.resume();
-                                    document.getElementById('scan-notice').style.display = 'none';
-                                }
-                            }, 2000);
-                        }
-                    }
-                ).then(() => {
-                    camBtn.innerText = "⏹️ Stop Camera";
-                    isCameraRunning = true;
-                }).catch(err => alert("Cameratoestemming vereist."));
+                    document.getElementById('scan-notice').style.display = 'none';
+                }).catch(err => console.log("Camera stop fout:", err));
             }
         }
+
+        function toggleCamera() {
+            if (isCameraRunning) {
+                stopCameraEngine();
+            } else {
+                startCameraEngine();
+            }
+        }
+
+        // 🔄 HERSTART CAMERA WANNEER JE TERUGKEERT IN DE APP
+        document.addEventListener("visibilitychange", function() {
+            if (document.hidden) {
+                // Je verlaat de pagina (bijv. tikt op Google Drive link)
+                if (isCameraRunning && html5QrCode) {
+                    html5QrCode.pause();
+                }
+            } else {
+                // Je komt terug in de web-app
+                if (isCameraRunning && html5QrCode) {
+                    if (html5QrCode.getState() === Html5QrcodeScannerState.PAUSED) {
+                        html5QrCode.resume();
+                    } else if (html5QrCode.getState() === Html5QrcodeScannerState.NOT_STARTED) {
+                        startCameraEngine();
+                    }
+                }
+            }
+        });
     </script>
 </body>
 </html>
